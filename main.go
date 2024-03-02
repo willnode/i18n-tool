@@ -18,11 +18,17 @@ func main() {
 		log.Fatalf("Failed to get current working directory: %v", err)
 	}
 
+	RealMain(currentDir)
+}
+
+func RealMain(currentDir string) error {
+
 	// Define folder paths
 	sourceFolder := "en"
 	targetFolders, err := getListOfLanguage(currentDir)
 	if err != nil {
 		log.Fatalf("Failed to get list of target folders: %v", err)
+		return err
 	}
 
 	// Construct full path for source folder
@@ -39,16 +45,20 @@ func main() {
 			}
 			if !info.IsDir() {
 				// Process YAML file
-				processYAMLFile(path, filepath.Join(targetFolder, path[len(sourceFolderPath)+1:]))
+				if err = processYAMLFile(path, filepath.Join(currentDir, targetFolder, path[len(sourceFolderPath)+1:])); err != nil {
+					return err
+				}
 			}
 			return nil
 		})
 		if err != nil {
 			log.Fatalf("Error traversing folder A: %v", err)
+			return err
 		}
 	}
 
 	fmt.Println("YAML files processed successfully.")
+	return nil
 }
 
 func getListOfLanguage(dirPath string) (langs []string, err error) {
@@ -74,12 +84,12 @@ func getListOfLanguage(dirPath string) (langs []string, err error) {
 }
 
 // processYAMLFile processes a YAML file, merging it with the corresponding file in folder B
-func processYAMLFile(pathA, pathB string) {
+func processYAMLFile(pathA, pathB string) error {
 	// Read YAML data from file A
 	dataA, err := os.ReadFile(pathA)
 	if err != nil {
 		log.Printf("Failed to read file A %s: %v", pathA, err)
-		return
+		return err
 	}
 
 	// Read YAML data from file B
@@ -87,7 +97,14 @@ func processYAMLFile(pathA, pathB string) {
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Printf("Failed to read file B %s: %v", pathB, err)
-			return
+			return err
+		} else {
+			if file, err := os.Create(pathB); err != nil {
+				return err
+			} else {
+				file.Close()
+				dataB = nil
+			}
 		}
 	}
 
@@ -96,19 +113,19 @@ func processYAMLFile(pathA, pathB string) {
 	err = yaml.Unmarshal(dataA, &yamlDataA)
 	if err != nil {
 		log.Printf("Failed to unmarshal YAML from file A %s: %v", pathA, err)
-		return
+		return err
 	}
 
 	// Unmarshal YAML data from file B
 	var yamlDataB interface{}
-	if dataB != nil {
+	if len(dataB) > 0 {
 		err = yaml.Unmarshal(dataB, &yamlDataB)
 		if err != nil {
 			log.Printf("Failed to unmarshal YAML from file B %s: %v", pathB, err)
-			return
+			return err
 		}
 	} else {
-		yamlDataB = make(map[interface{}]interface{})
+		yamlDataB = make(map[string]interface{})
 	}
 
 	// Merge YAML data
@@ -118,23 +135,24 @@ func processYAMLFile(pathA, pathB string) {
 	outputData, err := yaml.Marshal(&mergedYAML)
 	if err != nil {
 		log.Printf("Failed to marshal merged YAML for file %s: %v", pathB, err)
-		return
+		return err
 	}
 
 	// Write to file B
 	err = os.WriteFile(pathB, outputData, 0644)
 	if err != nil {
 		log.Printf("Failed to write to file B %s: %v", pathB, err)
-		return
+		return err
 	}
 
 	fmt.Printf("YAML file %s processed and saved to %s\n", pathA, pathB)
+	return nil
 }
 
 // mergeYAML merges YAML data from file A into file B
 func mergeYAML(dataA, dataB interface{}) interface{} {
-	mapA := dataA.(map[interface{}]interface{})
-	mapB := dataB.(map[interface{}]interface{})
+	mapA := dataA.(map[string]interface{})
+	mapB := dataB.(map[string]interface{})
 
 	for key, value := range mapA {
 		// Check if key exists in B
