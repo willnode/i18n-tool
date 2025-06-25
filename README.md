@@ -2,6 +2,12 @@
 
 Translation management tool. Framework-agnotics, manage using YAML or Markdown files. This tool is written in Go.
 
+## Install
+
+```sh
+go install github.com/willnode/i18n-tool/v2@main
+```
+
 ## How it works
 
 You have this directory:

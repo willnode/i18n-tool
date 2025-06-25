@@ -22,8 +22,6 @@ func main() {
 }
 
 func RealMain(currentDir string) error {
-
-	// Define folder paths
 	sourceFolder := "en"
 	targetFolders, err := getListOfLanguage(currentDir)
 	if err != nil {
@@ -31,28 +29,32 @@ func RealMain(currentDir string) error {
 		return err
 	}
 
-	// Construct full path for source folder
 	sourceFolderPath := filepath.Join(currentDir, sourceFolder)
 
-	// Iterate over target folders
 	for _, targetFolder := range targetFolders {
-
-		// Traverse folder A
 		err := filepath.Walk(sourceFolderPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				log.Printf("Error accessing path %s: %v", path, err)
 				return err
 			}
-			if !info.IsDir() {
-				// Process YAML file
-				if err = processYAMLFile(path, filepath.Join(currentDir, targetFolder, path[len(sourceFolderPath)+1:])); err != nil {
+
+			// Check if it's a regular file and has a .yaml extension
+			if !info.IsDir() && strings.HasSuffix(info.Name(), ".yaml") {
+				// Construct the target path relative to the current target language folder
+				relPath, err := filepath.Rel(sourceFolderPath, path)
+				if err != nil {
+					return fmt.Errorf("failed to get relative path for %s: %w", path, err)
+				}
+				targetFilePath := filepath.Join(currentDir, targetFolder, relPath)
+
+				if err = processYAMLFile(path, targetFilePath); err != nil {
 					return err
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			log.Fatalf("Error traversing folder A: %v", err)
+			log.Fatalf("Error traversing source folder: %v", err)
 			return err
 		}
 	}
